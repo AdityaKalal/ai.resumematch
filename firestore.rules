@@ -1,0 +1,164 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required)
+    //   - displayName: string (optional)
+    //   - photoURL: string (optional)
+    //   - role: string (required, 'user' or 'admin')
+    //   - createdAt: string (required)
+    //
+    // Collection: resumes
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required)
+    //   - fileName: string (required)
+    //   - fileUrl: string (optional)
+    //   - parsedData: string (optional, JSON)
+    //   - aiAnalysis: string (optional, JSON)
+    //   - createdAt: string (required)
+    //
+    // Collection: jobs
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required)
+    //   - company: string (required)
+    //   - location: string (optional)
+    //   - description: string (required)
+    //   - requirements: string (optional, JSON)
+    //   - salary: string (optional)
+    //   - createdAt: string (required)
+    //
+    // Collection: jobMatches
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required)
+    //   - resumeId: string (required)
+    //   - jobId: string (required)
+    //   - matchPercentage: number (required)
+    //   - missingSkills: string (optional, JSON)
+    //   - recommendations: string (optional, JSON)
+    //   - createdAt: string (required)
+    //
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "adityakalal5053@gmail.com" && request.auth.token.email_verified == true));
+    }
+    
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+    
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+    
+    function userIdUnchanged() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == request.auth.uid;
+    }
+    
+    function userIdNotModified() {
+      return !('userId' in request.resource.data) || request.resource.data.userId == resource.data.userId;
+    }
+    
+    function isValidUser(data) {
+      return hasRequiredFields(['uid', 'email', 'role', 'createdAt']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.role in ['user', 'admin'] &&
+             data.createdAt is string;
+    }
+    
+    function isValidResume(data) {
+      return hasRequiredFields(['userId', 'fileName', 'createdAt']) &&
+             data.userId is string &&
+             data.fileName is string && data.fileName.size() < 256 &&
+             data.createdAt is string &&
+             (!('fileUrl' in data) || (data.fileUrl is string && data.fileUrl.size() < 1000)) &&
+             (!('parsedData' in data) || (data.parsedData is string && data.parsedData.size() < 100000)) &&
+             (!('aiAnalysis' in data) || (data.aiAnalysis is string && data.aiAnalysis.size() < 100000));
+    }
+    
+    function isValidJob(data) {
+      return hasRequiredFields(['title', 'company', 'description', 'createdAt']) &&
+             data.title is string && data.title.size() < 256 &&
+             data.company is string && data.company.size() < 256 &&
+             data.description is string && data.description.size() < 100000 &&
+             data.createdAt is string &&
+             (!('location' in data) || (data.location is string && data.location.size() < 256)) &&
+             (!('requirements' in data) || (data.requirements is string && data.requirements.size() < 100000)) &&
+             (!('salary' in data) || (data.salary is string && data.salary.size() < 256));
+    }
+    
+    function isValidJobMatch(data) {
+      return hasRequiredFields(['userId', 'resumeId', 'jobId', 'matchPercentage', 'createdAt']) &&
+             data.userId is string &&
+             data.resumeId is string &&
+             data.jobId is string &&
+             data.matchPercentage is number && data.matchPercentage >= 0 && data.matchPercentage <= 100 &&
+             data.createdAt is string &&
+             (!('missingSkills' in data) || (data.missingSkills is string && data.missingSkills.size() < 100000)) &&
+             (!('recommendations' in data) || (data.recommendations is string && data.recommendations.size() < 100000));
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && uidUnchanged() && ((isOwner(userId) && request.resource.data.role == 'user') || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && uidNotModified() && ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      allow delete: if isAdmin();
+    }
+    
+    match /resumes/{resumeId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidResume(request.resource.data) && userIdUnchanged();
+      allow update: if isAuthenticated() && isValidResume(request.resource.data) && userIdNotModified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    match /jobs/{jobId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin() && isValidJob(request.resource.data);
+      allow update: if isAdmin() && isValidJob(request.resource.data);
+      allow delete: if isAdmin();
+    }
+    
+    match /jobMatches/{matchId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidJobMatch(request.resource.data) && userIdUnchanged();
+      allow update: if isAuthenticated() && isValidJobMatch(request.resource.data) && userIdNotModified() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}

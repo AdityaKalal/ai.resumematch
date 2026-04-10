@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the platform.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    },
+    "Resume": {
+      "title": "Resume",
+      "description": "A resume uploaded by a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "parsedData": { "type": "string", "description": "JSON stringified parsed data (skills, experience, education)" },
+        "aiAnalysis": { "type": "string", "description": "JSON stringified AI analysis (score, skillGap, formatting, atsScore)" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "fileName", "createdAt"]
+    },
+    "Job": {
+      "title": "Job",
+      "description": "A job listing.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "company": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "requirements": { "type": "string", "description": "JSON stringified array of requirements" },
+        "salary": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "company", "description", "createdAt"]
+    },
+    "JobMatch": {
+      "title": "JobMatch",
+      "description": "A match between a resume and a job.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "resumeId": { "type": "string" },
+        "jobId": { "type": "string" },
+        "matchPercentage": { "type": "number" },
+        "missingSkills": { "type": "string", "description": "JSON stringified array of missing skills" },
+        "recommendations": { "type": "string", "description": "JSON stringified array of recommendations" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "resumeId", "jobId", "matchPercentage", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles."
+    },
+    "/resumes/{resumeId}": {
+      "schema": { "$ref": "#/entities/Resume" },
+      "description": "Resumes uploaded by users."
+    },
+    "/jobs/{jobId}": {
+      "schema": { "$ref": "#/entities/Job" },
+      "description": "Job listings."
+    },
+    "/jobMatches/{matchId}": {
+      "schema": { "$ref": "#/entities/JobMatch" },
+      "description": "Job matches for users."
+    }
+  }
+}

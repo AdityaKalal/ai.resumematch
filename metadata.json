@@ -1,0 +1,5 @@
+{
+  "name": "AI Resume Analyzer & Job Match Platform",
+  "description": "Upload resumes, analyze them using AI, and match them with relevant jobs.",
+  "requestFramePermissions": []
+}
